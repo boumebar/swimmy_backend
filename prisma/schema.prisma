@@ -1,0 +1,96 @@
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+model User {
+  id            String    @id @default(cuid())
+  email         String    @unique
+  password      String
+  name          String
+  phone         String    @unique
+  avatar        String?
+  bio           String?
+  role          String    @default("user")
+  createdAt     DateTime  @default(now())
+
+  pools         Pool[]
+  sentMessages  Message[] @relation("sender")
+  receivedMessages Message[] @relation("receiver")
+  bookingsAsRenter Booking[] @relation("renter")
+  bookingsAsOwner Booking[] @relation("owner")
+}
+
+model Pool {
+  id            String    @id @default(cuid())
+  title         String
+  description   String    @db.Text
+  photos        String[]
+  address       String
+  latitude      Float
+  longitude     Float
+  capacity      Int
+  pricePerHour  Float
+  pricePerDay   Float
+  pricePerWeek  Float?
+
+  owner         User      @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  ownerId       String
+
+  bookings      Booking[]
+  availability  Availability[]
+
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+}
+
+model Availability {
+  id            String    @id @default(cuid())
+  pool          Pool      @relation(fields: [poolId], references: [id], onDelete: Cascade)
+  poolId        String
+  date          DateTime  @db.Date
+  isAvailable   Boolean   @default(true)
+
+  @@unique([poolId, date])
+}
+
+model Booking {
+  id            String    @id @default(cuid())
+  pool          Pool      @relation(fields: [poolId], references: [id])
+  poolId        String
+  renter        User      @relation("renter", fields: [renterId], references: [id])
+  renterId      String
+  owner         User      @relation("owner", fields: [ownerId], references: [id])
+  ownerId       String
+
+  startDate     DateTime
+  endDate       DateTime
+  startTime     String?
+  endTime       String?
+
+  totalPrice    Float
+  status        String    @default("pending")
+  notes         String?
+
+  createdAt     DateTime  @default(now())
+
+  @@unique([poolId, startDate, endDate])
+}
+
+model Message {
+  id            String    @id @default(cuid())
+  sender        User      @relation("sender", fields: [senderId], references: [id])
+  senderId      String
+  receiver      User      @relation("receiver", fields: [receiverId], references: [id])
+  receiverId    String
+  booking       Booking?  @relation(fields: [bookingId], references: [id], onDelete: SetNull)
+  bookingId     String?
+
+  text          String    @db.Text
+  isRead        Boolean   @default(false)
+  createdAt     DateTime  @default(now())
+}
