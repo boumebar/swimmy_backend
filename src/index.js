@@ -4,6 +4,8 @@ const http = require('http');
 const socketIO = require('socket.io');
 require('dotenv').config();
 
+const authRoutes = require('./routes/auth');
+
 const app = express();
 const server = http.createServer(app);
 const io = socketIO(server, {
@@ -13,6 +15,9 @@ const io = socketIO(server, {
 // Middleware
 app.use(cors());
 app.use(express.json());
+
+// Routes
+app.use('/api/auth', authRoutes);
 
 // Health check endpoint
 app.get('/api/health', (req, res) => {
