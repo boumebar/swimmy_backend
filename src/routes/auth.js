@@ -3,6 +3,7 @@ const router = express.Router();
 const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
 const { PrismaClient } = require('@prisma/client');
+const authMiddleware = require('../middleware/auth');
 
 const prisma = new PrismaClient();
 
@@ -98,6 +99,69 @@ router.post('/login', async (req, res) => {
     });
   } catch (error) {
     console.status(500).json({ error: error.message });
+  }
+});
+
+// GET /users/me - Get current user
+router.get('/me', authMiddleware, async (req, res) => {
+  try {
+    const user = await prisma.user.findUnique({
+      where: { id: req.user.userId },
+      select: {
+        id: true,
+        email: true,
+        name: true,
+        phone: true,
+        avatar: true,
+        bio: true,
+        role: true,
+        createdAt: true,
+      },
+    });
+
+    if (!user) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    res.json(user);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// PATCH /users/:id - Update user profile
+router.patch('/:id', authMiddleware, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { name, phone, avatar, bio } = req.body;
+
+    // Only allow users to update their own profile
+    if (req.user.userId !== id) {
+      return res.status(403).json({ error: 'Forbidden' });
+    }
+
+    const updatedUser = await prisma.user.update({
+      where: { id },
+      data: {
+        ...(name && { name }),
+        ...(phone && { phone }),
+        ...(avatar && { avatar }),
+        ...(bio && { bio }),
+      },
+      select: {
+        id: true,
+        email: true,
+        name: true,
+        phone: true,
+        avatar: true,
+        bio: true,
+        role: true,
+      },
+    });
+
+    res.json(updatedUser);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
   }
 });
 
