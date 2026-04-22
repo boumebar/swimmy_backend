@@ -5,6 +5,7 @@ const socketIO = require('socket.io');
 require('dotenv').config();
 
 const authRoutes = require('./routes/auth');
+const poolRoutes = require('./routes/pools');
 
 const app = express();
 const server = http.createServer(app);
@@ -18,6 +19,7 @@ app.use(express.json());
 
 // Routes
 app.use('/api/auth', authRoutes);
+app.use('/api/pools', poolRoutes);
 
 // Health check endpoint
 app.get('/api/health', (req, res) => {
