@@ -5,14 +5,37 @@ const authMiddleware = require('../middleware/auth');
 
 const prisma = new PrismaClient();
 
+// VALIDATION HELPER
+const validatePrices = (pricePerHour, pricePerDay, pricePerWeek, capacity) => {
+  if (pricePerHour !== undefined && pricePerHour !== null && pricePerHour < 0) {
+    return 'pricePerHour cannot be negative';
+  }
+  if (pricePerDay !== undefined && pricePerDay !== null && pricePerDay < 0) {
+    return 'pricePerDay cannot be negative';
+  }
+  if (pricePerWeek !== undefined && pricePerWeek !== null && pricePerWeek < 0) {
+    return 'pricePerWeek cannot be negative';
+  }
+  if (capacity !== undefined && capacity !== null && capacity <= 0) {
+    return 'capacity must be positive';
+  }
+  return null;
+};
+
 // CREATE POOL
 router.post('/', authMiddleware, async (req, res) => {
   try {
     const { title, description, photos, address, latitude, longitude, capacity, pricePerHour, pricePerDay, pricePerWeek } = req.body;
 
-    // Validation
+    // Validation - Required fields
     if (!title || !description || !address || !capacity || !pricePerDay) {
       return res.status(400).json({ error: 'Missing required fields' });
+    }
+
+    // Validation - Prices & Capacity
+    const priceError = validatePrices(pricePerHour, pricePerDay, pricePerWeek, capacity);
+    if (priceError) {
+      return res.status(400).json({ error: priceError });
     }
 
     // Create pool
@@ -38,17 +61,22 @@ router.post('/', authMiddleware, async (req, res) => {
   }
 });
 
-// GET ALL POOLS
+// GET ALL POOLS (with filters)
 router.get('/', async (req, res) => {
   try {
     const { location, priceMax } = req.query;
 
     let where = {};
+    
     if (location) {
       where.address = { contains: location, mode: 'insensitive' };
     }
+    
     if (priceMax) {
-      where.pricePerDay = { lte: parseFloat(priceMax) };
+      const maxPrice = Math.max(0, parseFloat(priceMax));
+      if (maxPrice > 0) {
+        where.pricePerDay = { lte: maxPrice };
+      }
     }
 
     const pools = await prisma.pool.findMany({
@@ -95,6 +123,17 @@ router.patch('/:id', authMiddleware, async (req, res) => {
     // Only owner can update
     if (pool.ownerId !== req.user.userId) {
       return res.status(403).json({ error: 'Forbidden' });
+    }
+
+    // Validation - Prices & Capacity
+    const priceError = validatePrices(
+      req.body.pricePerHour,
+      req.body.pricePerDay,
+      req.body.pricePerWeek,
+      req.body.capacity
+    );
+    if (priceError) {
+      return res.status(400).json({ error: priceError });
     }
 
     const updated = await prisma.pool.update({
