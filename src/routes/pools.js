@@ -134,4 +134,79 @@ router.delete('/:id', authMiddleware, async (req, res) => {
   }
 });
 
+// GET POOL AVAILABILITY
+router.get('/:id/availability', async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    // Get all bookings for this pool
+    const bookings = await prisma.booking.findMany({
+      where: {
+        poolId: id,
+        status: { in: ['pending', 'confirmed'] },
+      },
+    });
+
+    // Get availability records
+    const availability = await prisma.availability.findMany({
+      where: { poolId: id },
+      orderBy: { date: 'asc' },
+    });
+
+    res.json({
+      poolId: id,
+      bookings: bookings.map((b) => ({
+        id: b.id,
+        startDate: b.startDate,
+        endDate: b.endDate,
+        status: b.status,
+      })),
+      availability: availability,
+    });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// SET POOL AVAILABILITY
+router.post('/:id/availability', authMiddleware, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { date, isAvailable } = req.body;
+
+    // Verify pool exists and user is owner
+    const pool = await prisma.pool.findUnique({
+      where: { id },
+    });
+
+    if (!pool) {
+      return res.status(404).json({ error: 'Pool not found' });
+    }
+
+    if (pool.ownerId !== req.user.userId) {
+      return res.status(403).json({ error: 'Forbidden' });
+    }
+
+    // Upsert availability
+    const availability = await prisma.availability.upsert({
+      where: {
+        poolId_date: {
+          poolId: id,
+          date: new Date(date),
+        },
+      },
+      update: { isAvailable },
+      create: {
+        poolId: id,
+        date: new Date(date),
+        isAvailable,
+      },
+    });
+
+    res.json(availability);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
 module.exports = router;
