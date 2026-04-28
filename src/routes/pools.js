@@ -67,11 +67,11 @@ router.get('/', async (req, res) => {
     const { location, priceMax } = req.query;
 
     let where = {};
-    
+
     if (location) {
       where.address = { contains: location, mode: 'insensitive' };
     }
-    
+
     if (priceMax) {
       const maxPrice = Math.max(0, parseFloat(priceMax));
       if (maxPrice > 0) {
@@ -104,6 +104,40 @@ router.get('/:id', async (req, res) => {
     }
 
     res.json(pool);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// GET POOL AVAILABILITY
+router.get('/:id/availability', async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    // Get all bookings for this pool
+    const bookings = await prisma.booking.findMany({
+      where: {
+        poolId: id,
+        status: { in: ['pending', 'confirmed'] },
+      },
+    });
+
+    // Get availability records
+    const availability = await prisma.availability.findMany({
+      where: { poolId: id },
+      orderBy: { date: 'asc' },
+    });
+
+    res.json({
+      poolId: id,
+      bookings: bookings.map((b) => ({
+        id: b.id,
+        startDate: b.startDate,
+        endDate: b.endDate,
+        status: b.status,
+      })),
+      availability: availability,
+    });
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
@@ -168,40 +202,6 @@ router.delete('/:id', authMiddleware, async (req, res) => {
     });
 
     res.json({ message: 'Pool deleted' });
-  } catch (error) {
-    res.status(500).json({ error: error.message });
-  }
-});
-
-// GET POOL AVAILABILITY
-router.get('/:id/availability', async (req, res) => {
-  try {
-    const { id } = req.params;
-
-    // Get all bookings for this pool
-    const bookings = await prisma.booking.findMany({
-      where: {
-        poolId: id,
-        status: { in: ['pending', 'confirmed'] },
-      },
-    });
-
-    // Get availability records
-    const availability = await prisma.availability.findMany({
-      where: { poolId: id },
-      orderBy: { date: 'asc' },
-    });
-
-    res.json({
-      poolId: id,
-      bookings: bookings.map((b) => ({
-        id: b.id,
-        startDate: b.startDate,
-        endDate: b.endDate,
-        status: b.status,
-      })),
-      availability: availability,
-    });
   } catch (error) {
     res.status(500).json({ error: error.message });
   }

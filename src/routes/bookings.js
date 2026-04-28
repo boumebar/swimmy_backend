@@ -55,6 +55,13 @@ router.post('/', authMiddleware, async (req, res) => {
 
     res.json(booking);
   } catch (error) {
+    // Handle unique constraint error (duplicate booking dates)
+    if (error.code === 'P2002') {
+      return res.status(400).json({
+        error: 'Pool is already booked for these dates. Please select different dates.'
+      });
+    }
+
     res.status(500).json({ error: error.message });
   }
 });
